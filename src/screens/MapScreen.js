@@ -1,4 +1,4 @@
-import React, { Component } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -14,7 +14,7 @@ let MapViewMob, MarkerMob, MapViewDirectionsMob;
 if (Platform.OS === "android" || Platform.OS === "ios") {
   MapViewMob = require("react-native-maps").default;
   MarkerMob = require("react-native-maps").Marker;
-  MapViewDirectionsMob = require("react-native-maps-directions").default;
+  MapViewDirectionsMob = require("react-native-maps-routes").default;
 }
 let MapView;
 
@@ -39,95 +39,112 @@ const debounce = (func, delay) => {
   };
 };
 
-export default class MapScreen extends Component {
-  constructor(props) {
-    super(props);
-    this.debouncedOnRegionChange = debounce(this.onRegionChange, 10);
-    this.state = {
-      coords: [],
-      googleMapsLoaded: false,
-      origin: { latitude: 33.843663, longitude: -117.945171 },
-      destination: { latitude: 33.8252956, longitude: -117.8307728 },
-      region: {
-        latitude: 33.8252956,
-        longitude: -117.8307728,
-        latitudeDelta: 0.05, // Adjust this value for zoom level
-        longitudeDelta: 0.045, // Adjust this value for zoom level
-      },
-      waypoint: { latitude: 33.8589565, longitude: -117.9589782 },
-    };
-  }
-  async componentDidMount() {
-    if (Platform.OS === "web") {
-      loadGoogleMapsAPI(() => {
-        this.setState({ googleMapsLoaded: true });
-      });
-    }
 
-    try {
-      const newcoords = await fetchRouteData(
-        this.state.origin,
-        this.state.waypoint,
-        this.state.destination
-      );
-      this.setState({ coords: newcoords });
-    } catch (error) {
-      console.error("Error fetching COORDS", error);
-    }
-  }
+export default function MapScreen (){
+  const [coords, setCoords] = useState([]);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
 
-  //  Create a debounced version of onRegionChange
-  debouncedOnRegionChange = debounce((newRegion) => {
-    // Check if the new region has valid latitude and longitude
-    if (
-      !isNaN(newRegion.latitude) &&
-      !isNaN(newRegion.longitude) &&
-      isFinite(newRegion.latitude) &&
-      isFinite(newRegion.longitude)
-    ) {
-      // Update the state only if the new region has valid coordinates
-      this.setState({ region: newRegion });
-    }
-  }, 10);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-  onRegionChangeComplete = (region) => {
-    console.log("Region changed:", region);
+  const [region, setRegion] = useState({
+    latitude: 33.8252956,
+    longitude: -117.8307728,
+    latitudeDelta: 0.045,
+    longitudeDelta: 0.045,
+  });
+
+  const origin = { latitude: 33.843663, longitude: -117.945171 };
+  const destination = { latitude: 33.8252956, longitude: -117.8307728 };
+  const waypoint = { latitude: 33.8589565, longitude: -117.9589782 };
+
+  const debouncedOnRegionChange = useCallback(
+    debounce((newRegion) => {
+      if (
+        !isNaN(newRegion.latitude) &&
+        !isNaN(newRegion.longitude) &&
+        isFinite(newRegion.latitude) &&
+        isFinite(newRegion.longitude)
+      ) {
+        setRegion(newRegion);
+      }
+    }, 10),
+    []
+  );
+
+
+  const onRegionChangeComplete = (changedRegion) => {
+    console.log("Region changed:", changedRegion);
   };
 
-  onPress = (event) => {
+  const onPress = (event) => {
     console.log("Map pressed:", event.nativeEvent.coordinate);
   };
 
-  onDoublePress = (event) => {
+  const onDoublePress = (event) => {
     console.log("Map double pressed:", event.nativeEvent.coordinate);
   };
 
-  onPanDrag = () => {
+  const onPanDrag = () => {
     console.log("Map panned or dragged");
   };
 
-  render() {
-    const { origin, destination, googleMapsLoaded, coords } = this.state;
+  useEffect(() => {
+    const fetchData = async () => {
+      if (Platform.OS === "web") {
+        loadGoogleMapsAPI(() => {
+          setGoogleMapsLoaded(true);
+        });
+      }
+
+      try {
+        const newCoords = await fetchRouteData(origin, waypoint, destination);
+        setCoords(newCoords);
+        console.log(coords);
+        console.log("Origin:", origin);
+console.log("Waypoint:", waypoint);
+console.log("Destination:", destination);
+
+// Verify API key
+// console.log("API Key:", apiKey);
+
+      } catch (error) {
+        console.error("Error fetching COORDS", error);
+        setError(true)
+      }
+    };
+
+    fetchData();
+  }, [origin, waypoint, destination, retryCount]);
+
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text>Error loading map. Please check your network connection and try again.</Text>
+        <Button title="Retry" onPress={() => setRetryCount(retryCount + 1)} />
+      </View>
+    );
+  }
 
     return (
       <View style={styles.container}>
         {googleMapsLoaded && Platform.OS === "web" ? (
           <View style={styles.container}>
             <MapView
-              style={styles.map}
-              initialRegion={this.state.region}
-              onRegionChange={(new_region) => {
-                this.debouncedOnRegionChange(new_region);
-              }}
-              onRegionChangeComplete={this.onRegionChangeComplete}
-              onPress={this.onPress}
-              onDoublePress={this.onDoublePress}
-              onPanDrag={this.onPanDrag}
-              zoomEnabled={true}
-              zoomControlEnabled={true}
-              mapType="terrain"
-              showsPointsOfInterest={false}
-            >
+            style={styles.map}
+            initialRegion={region}
+            onRegionChange={(newRegion) => {
+              debouncedOnRegionChange(newRegion);
+            }}
+            onRegionChangeComplete={onRegionChangeComplete}
+            onPress={onPress}
+            onDoublePress={onDoublePress}
+            onPanDrag={onPanDrag}
+            zoomEnabled={true}
+            zoomControlEnabled={true}
+            mapType="terrain"
+            showsPointsOfInterest={false}            >
               <MapView.Marker coordinate={origin} title="Origin">
                 <View style={styles.markerContainer}></View>
               </MapView.Marker>
@@ -199,7 +216,7 @@ export default class MapScreen extends Component {
         )}
       </View>
     );
-  }
+  
 }
 
 const styles = StyleSheet.create({
