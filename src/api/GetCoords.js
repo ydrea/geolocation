@@ -62,11 +62,11 @@ async function fetchRouteData(originLatLong, waypointLatLong, destinationLatLong
     const destination = `${destinationLatLong.latitude},${destinationLatLong.longitude}`;
     const waypoint = `${waypointLatLong.latitude},${waypointLatLong.longitude}`;
     const proxyUrl = "https://cors-anywhere.herokuapp.com/";
-    const apiKey = "AIzaSyA9lCiubC7_rv6qsc7OVa2exQom3pjg-Fo"; // Replace with your API key
+    const apiKey = ""; // Replace with your API key
   
     try {
         const response = await fetch(
-            `${proxyUrl}https://maps.googleapis.com/maps/api/routes?origin=${origin}&waypoints=${waypoint}&destination=${destination}&key=${apiKey}`
+            `${proxyUrl}https://maps.googleapis.com/maps/api/routes/json?origin=${origin}&waypoints=${waypoint}&destination=${destination}&key=${apiKey}`
         );
   
         if (!response.ok) {
